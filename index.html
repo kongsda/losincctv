@@ -1,46 +1,24 @@
 <script>
-    // Use CORS proxy to bypass mixed content and CORS issues
-    const corsProxy = 'https://cors-anywhere.herokuapp.com/';
-    const cameraUrl = 'http://admin:NHDLosin23@203.147.59.117:31954/ISAPI/Streaming/channels/2/picture';
-    const baseUrl = corsProxy + cameraUrl;
-    
+    const baseUrl = 'http://admin:NHDLosin23@203.147.59.117:31954/ISAPI/Streaming/channels/2/picture';
     const maxImages = 9;
     let imageHistory = [];
-    let refreshInterval;
-    let isRefreshing = true;
 
     function addNewImage() {
         const now = new Date();
         const timestamp = now.getTime();
         const timeString = now.toLocaleTimeString();
-        
-        // Create image URL with timestamp to prevent caching
         const imageUrl = `${baseUrl}?t=${timestamp}`;
         
-        // Test if the proxy is working
-        const img = new Image();
-        img.crossOrigin = "anonymous"; // Enable CORS
-        img.onload = function() {
-            // Add to history with timestamp
-            imageHistory.unshift({
-                url: imageUrl,
-                time: timeString
-            });
-            
-            if (imageHistory.length > maxImages) {
-                imageHistory.pop();
-            }
+        imageHistory.unshift({
+            url: imageUrl,
+            time: timeString
+        });
+        
+        if (imageHistory.length > maxImages) {
+            imageHistory.pop();
+        }
 
-            updateGrid();
-            document.getElementById('status').textContent = `Last updated: ${timeString} (${imageHistory.length} images stored)`;
-        };
-        
-        img.onerror = function() {
-            document.getElementById('status').textContent = `Error loading image at ${timeString}. Check camera connection.`;
-            console.error('Failed to load image:', imageUrl);
-        };
-        
-        img.src = imageUrl;
+        updateGrid();
     }
 
     function updateGrid() {
@@ -50,22 +28,14 @@
         imageHistory.forEach((imageData, index) => {
             const container = document.createElement('div');
             container.className = 'image-container';
-            
-            const img = document.createElement('img');
-            img.src = imageData.url;
-            img.alt = `CCTV Image ${index + 1}`;
-            img.crossOrigin = "anonymous";
-            
-            const timestamp = document.createElement('div');
-            timestamp.className = 'timestamp';
-            timestamp.textContent = imageData.time;
-            
-            container.appendChild(img);
-            container.appendChild(timestamp);
+            // Direct img tag - sometimes bypasses mixed content for images
+            container.innerHTML = `
+                <img src="${imageData.url}" alt="CCTV Image ${index + 1}" style="width:100%; height:auto;">
+                <div class="timestamp">${imageData.time}</div>
+            `;
             grid.appendChild(container);
         });
     }
-
     function toggleRefresh() {
         if (isRefreshing) {
             clearInterval(refreshInterval);
