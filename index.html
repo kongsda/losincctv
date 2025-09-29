@@ -1,153 +1,372 @@
-<script>
-    const username = 'admin';
-    const password = 'NHDlosin23';
-    const cameraIP = '203.147.59.117:31954';
-    const cameraPath = '/ISAPI/Streaming/channels/2/picture';
-    const originalUrl = `https://${username}:${password}@${cameraIP}${cameraPath}`;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCTV Time Lapse Monitor</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            background: #f0f0f0; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        h1 { 
+            color: #333; 
+            margin: 20px 0; 
+        }
+        #cors-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 800px;
+            text-align: left;
+        }
+        #cors-notice h3 {
+            color: #856404;
+            margin-top: 0;
+        }
+        #cors-notice p {
+            margin: 10px 0;
+            line-height: 1.4;
+        }
+        #cors-notice a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        #cors-notice a:hover {
+            text-decoration: underline;
+        }
+        #grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 15px; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        .image-container { 
+            border: 2px solid #ccc; 
+            background: #fff; 
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .image-container img { 
+            width: 100%; 
+            height: auto; 
+            border-radius: 4px;
+        }
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        #status { 
+            margin: 20px 0; 
+            color: #666; 
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .status-error {
+            background: #ffe6e6;
+            color: #d63031;
+        }
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        #controls {
+            margin: 20px 0;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #test-link {
+            display: inline-block;
+            margin: 10px 0;
+            padding: 8px 15px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        #test-link:hover {
+            background: #1e7e34;
+            text-decoration: none;
+        }
+        @media (max-width: 768px) {
+            #grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            #cors-notice {
+                margin: 10px;
+                padding: 10px;
+            }
+        }
+        @media (max-width: 480px) {
+            #grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>CCTV Time Lapse Monitor</h1>
     
-    // Try these working CORS proxies one by one
-    const corsProxies = [
-        'https://api.allorigins.win/raw?url=',           // Option 1 [web:149][web:152]
-        'https://corsproxy.io/?',                       // Option 2 [web:149][web:152] 
-        'https://cors.sh/',                             // Option 3 [web:152]
-        'https://proxy.cors.sh/',                       // Option 4 [web:152]
-        'https://cors-anywhere.herokuapp.com/'          // Option 5 (often doesn't work)
-    ];
-    
-    // Start with the first proxy
-    let currentProxyIndex = 0;
-    const baseUrl = corsProxies[currentProxyIndex] + originalUrl;
-    
-    const maxImages = 9;
-    let imageHistory = [];
-    let refreshInterval;
-    let isRefreshing = true;
+    <div id="cors-notice">
+        <h3>📢 Important Setup Instructions:</h3>
+        <p><strong>If images don't load automatically, you need to install a CORS browser extension:</strong></p>
+        <p><strong>For Chrome/Edge:</strong></p>
+        <ul>
+            <li>Install "CORS Unblock" or "Moesif Origin & CORS Changer" extension</li>
+            <li>Enable the extension for this website</li>
+        </ul>
+        <p><strong>For Firefox:</strong></p>
+        <ul>
+            <li>Install "CORS Everywhere" extension</li>
+            <li>Enable the extension for this website</li>
+        </ul>
+        <p><strong>Test your camera connection:</strong> 
+        <a href="https://admin:NHDlosin23@203.147.59.117:31954/ISAPI/Streaming/channels/2/picture" target="_blank" id="test-link">Click here to test camera directly</a>
+        </p>
+        <p><em>If the test link above shows your camera image, then the extension will make this page work!</em></p>
+    </div>
 
-    function addNewImage() {
-        const now = new Date();
-        const timestamp = now.getTime();
-        const timeString = now.toLocaleTimeString();
-        
-        const imageUrl = `${baseUrl}&t=${timestamp}`;
-        
-        // Test with fetch first to see detailed errors
-        fetch(imageUrl)
-            .then(response => {
-                console.log('Response status:', response.status);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                return response.blob();
-            })
-            .then(blob => {
-                const imageUrl = URL.createObjectURL(blob);
+    <div id="controls">
+        <button onclick="toggleRefresh()" id="toggle-btn">Pause/Resume</button>
+        <button onclick="clearImages()">Clear All</button>
+        <button onclick="addNewImage()" id="manual-btn">Manual Refresh</button>
+        <span id="refresh-status">Auto-refresh: ON (every 30s)</span>
+    </div>
+    
+    <div id="status">Loading latest image...</div>
+    <div id="grid"></div>
+
+    <script>
+        // Direct connection (no CORS proxy)
+        const baseUrl = 'https://admin:NHDlosin23@203.147.59.117:31954/ISAPI/Streaming/channels/2/picture';
+        const maxImages = 9;
+        let imageHistory = [];
+        let refreshInterval;
+        let isRefreshing = true;
+        let errorCount = 0;
+        let successCount = 0;
+
+        function addNewImage() {
+            const now = new Date();
+            const timestamp = now.getTime();
+            const timeString = now.toLocaleTimeString();
+            
+            // Add timestamp to prevent caching
+            const imageUrl = `${baseUrl}?t=${timestamp}`;
+            
+            // Update status to show loading
+            updateStatus('🔄 Loading new image...', 'loading');
+            
+            // Create a test image to see if it loads
+            const testImg = new Image();
+            
+            testImg.onload = function() {
+                console.log('✅ Image loaded successfully at', timeString);
+                successCount++;
+                errorCount = 0; // Reset error count on success
                 
+                // Add to history
                 imageHistory.unshift({
                     url: imageUrl,
                     time: timeString
                 });
                 
                 if (imageHistory.length > maxImages) {
-                    // Clean up old blob URLs
-                    if (imageHistory[maxImages].url.startsWith('blob:')) {
-                        URL.revokeObjectURL(imageHistory[maxImages].url);
-                    }
                     imageHistory.pop();
                 }
-                
+
                 updateGrid();
-                document.getElementById('status').textContent = `✅ Last updated: ${timeString} (${imageHistory.length} images stored)`;
+                updateStatus(`✅ Last updated: ${timeString} (${imageHistory.length} images stored, ${successCount} successful loads)`, 'success');
+                
+                // Re-enable manual button
+                document.getElementById('manual-btn').disabled = false;
+            };
+            
+            testImg.onerror = function() {
+                console.error('❌ Failed to load image at', timeString);
+                errorCount++;
+                
+                let errorMsg = `❌ Error loading image at ${timeString}`;
+                
+                if (errorCount === 1) {
+                    errorMsg += ' - This might be a CORS issue. Please install a CORS browser extension (see instructions above).';
+                } else if (errorCount > 3) {
+                    errorMsg += ` - ${errorCount} consecutive failures. Check camera connection or install CORS extension.`;
+                }
+                
+                updateStatus(errorMsg, 'error');
+                document.getElementById('manual-btn').disabled = false;
+            };
+            
+            // Disable manual button during load
+            document.getElementById('manual-btn').disabled = true;
+            
+            // Set the source to trigger load/error
+            testImg.src = imageUrl;
+        }
+
+        function updateGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            
+            imageHistory.forEach((imageData, index) => {
+                const container = document.createElement('div');
+                container.className = 'image-container';
+                
+                const img = document.createElement('img');
+                img.src = imageData.url;
+                img.alt = `CCTV Image ${index + 1}`;
+                img.loading = 'lazy'; // Improve performance
+                
+                // Add error handling for individual images
+                img.onerror = function() {
+                    this.style.display = 'none';
+                    console.log('Individual image failed to display:', imageData.time);
+                };
+                
+                const timestamp = document.createElement('div');
+                timestamp.className = 'timestamp';
+                timestamp.textContent = imageData.time;
+                
+                container.appendChild(img);
+                container.appendChild(timestamp);
+                grid.appendChild(container);
+            });
+        }
+
+        function updateStatus(message, type = 'normal') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            
+            // Remove existing status classes
+            statusDiv.classList.remove('status-error', 'status-success');
+            
+            // Add appropriate class
+            if (type === 'error') {
+                statusDiv.classList.add('status-error');
+            } else if (type === 'success') {
+                statusDiv.classList.add('status-success');
+            }
+        }
+
+        function toggleRefresh() {
+            const toggleBtn = document.getElementById('toggle-btn');
+            const refreshStatus = document.getElementById('refresh-status');
+            
+            if (isRefreshing) {
+                clearInterval(refreshInterval);
+                refreshStatus.textContent = 'Auto-refresh: OFF';
+                toggleBtn.textContent = 'Resume';
+                isRefreshing = false;
+                updateStatus('⏸️ Auto-refresh paused. Use "Manual Refresh" or "Resume" to continue.', 'normal');
+            } else {
+                startRefresh();
+                refreshStatus.textContent = 'Auto-refresh: ON (every 30s)';
+                toggleBtn.textContent = 'Pause';
+                isRefreshing = true;
+                updateStatus('▶️ Auto-refresh resumed.', 'normal');
+            }
+        }
+
+        function clearImages() {
+            imageHistory = [];
+            updateGrid();
+            successCount = 0;
+            errorCount = 0;
+            updateStatus('🗑️ Images cleared. Next refresh will start new sequence.', 'normal');
+        }
+
+        function startRefresh() {
+            // Clear any existing interval
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            
+            // Start new interval
+            refreshInterval = setInterval(addNewImage, 30000); // 30 seconds
+        }
+
+        // Check if CORS extension might be needed
+        function checkCORSSupport() {
+            // Try a quick test to see if direct access works
+            fetch(baseUrl + '?test=' + Date.now(), {
+                method: 'HEAD',
+                mode: 'cors'
+            })
+            .then(response => {
+                console.log('✅ CORS test successful, no extension needed');
+                document.getElementById('cors-notice').style.display = 'none';
             })
             .catch(error => {
-                console.error('Fetch error:', error);
-                document.getElementById('status').textContent = `❌ Error: ${error.message} at ${timeString}`;
-                
-                // Try next proxy if current one fails
-                tryNextProxy();
+                console.log('⚠️ CORS test failed, extension recommended:', error.message);
             });
-    }
-    
-    function tryNextProxy() {
-        currentProxyIndex++;
-        if (currentProxyIndex < corsProxies.length) {
-            const newProxy = corsProxies[currentProxyIndex];
-            console.log('Trying proxy:', newProxy);
-            baseUrl = newProxy + originalUrl;
-            document.getElementById('status').textContent = `🔄 Trying alternative proxy ${currentProxyIndex + 1}/${corsProxies.length}...`;
-            
-            // Try again with new proxy
-            setTimeout(addNewImage, 2000);
-        } else {
-            document.getElementById('status').textContent = `❌ All CORS proxies failed. Try manual browser fix below.`;
-            showManualFix();
         }
-    }
-    
-    function showManualFix() {
-        const statusDiv = document.getElementById('status');
-        statusDiv.innerHTML = `
-            <div style="background: #ffe6e6; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <strong>All CORS proxies failed. Try this manual fix:</strong><br>
-                1. <a href="${originalUrl}" target="_blank">Click here to test camera URL directly</a><br>
-                2. If images load above ↑, the issue is CORS. Try these browser fixes:<br>
-                • <strong>Chrome:</strong> Install "CORS Unblock" extension [web:141][web:146]<br>
-                • <strong>Firefox:</strong> Install "CORS Everywhere" extension<br>
-                • Or use direct method below (no CORS proxy)
-            </div>
-        `;
-    }
 
-    function updateGrid() {
-        const grid = document.getElementById('grid');
-        grid.innerHTML = '';
+        // Initialize
+        console.log('🚀 CCTV Time Lapse Monitor starting...');
+        console.log('Camera URL:', baseUrl);
         
-        imageHistory.forEach((imageData, index) => {
-            const container = document.createElement('div');
-            container.className = 'image-container';
-            
-            const img = document.createElement('img');
-            img.src = imageData.url;
-            img.alt = `CCTV Image ${index + 1}`;
-            
-            const timestamp = document.createElement('div');
-            timestamp.className = 'timestamp';
-            timestamp.textContent = imageData.time;
-            
-            container.appendChild(img);
-            container.appendChild(timestamp);
-            grid.appendChild(container);
-        });
-    }
-
-    function toggleRefresh() {
-        if (isRefreshing) {
-            clearInterval(refreshInterval);
-            document.getElementById('refresh-status').textContent = 'Auto-refresh: OFF';
-            isRefreshing = false;
-        } else {
-            startRefresh();
-            document.getElementById('refresh-status').textContent = 'Auto-refresh: ON (every 30s)';
-            isRefreshing = true;
-        }
-    }
-
-    function clearImages() {
-        // Clean up blob URLs
-        imageHistory.forEach(item => {
-            if (item.url.startsWith('blob:')) {
-                URL.revokeObjectURL(item.url);
+        // Check CORS support
+        checkCORSSupport();
+        
+        // Initial load
+        addNewImage();
+        
+        // Start auto-refresh
+        startRefresh();
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            if (event.ctrlKey || event.metaKey) {
+                switch(event.key) {
+                    case ' ': // Ctrl/Cmd + Space = Toggle refresh
+                        event.preventDefault();
+                        toggleRefresh();
+                        break;
+                    case 'r': // Ctrl/Cmd + R = Manual refresh (prevent default browser refresh)
+                        event.preventDefault();
+                        addNewImage();
+                        break;
+                    case 'c': // Ctrl/Cmd + C = Clear (but don't prevent copy)
+                        if (event.shiftKey) {
+                            event.preventDefault();
+                            clearImages();
+                        }
+                        break;
+                }
             }
         });
-        imageHistory = [];
-        updateGrid();
-        document.getElementById('status').textContent = 'Images cleared. Next refresh will start new sequence.';
-    }
-
-    function startRefresh() {
-        refreshInterval = setInterval(addNewImage, 30000);
-    }
-
-    // Initial load
-    addNewImage();
-    startRefresh();
-</script>
+        
+        // Show keyboard shortcuts in console
+        console.log('⌨️ Keyboard shortcuts:');
+        console.log('  Ctrl/Cmd + Space: Toggle auto-refresh');
+        console.log('  Ctrl/Cmd + R: Manual refresh');
+        console.log('  Ctrl/Cmd + Shift + C: Clear all images');
+    </script>
+</body>
+</html>
