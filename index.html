@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCTV Time Lapse</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            background: #f0f0f0; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        h1 { 
+            color: #333; 
+            margin: 20px 0; 
+        }
+        #grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 15px; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        .image-container { 
+            border: 2px solid #ccc; 
+            background: #fff; 
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .image-container img { 
+            width: 100%; 
+            height: auto; 
+            border-radius: 4px;
+        }
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        #status { 
+            margin: 20px 0; 
+            color: #666; 
+            font-weight: bold;
+        }
+        #controls {
+            margin: 20px 0;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+    </style>
+</head>
+<body>
+    <h1>CCTV Time Lapse Monitor</h1>
+    <div id="controls">
+        <button onclick="toggleRefresh()">Pause/Resume</button>
+        <button onclick="clearImages()">Clear All</button>
+        <span id="refresh-status">Auto-refresh: ON (every 30s)</span>
+    </div>
+    <div id="status">Loading latest image...</div>
+    <div id="grid"></div>
+
+    <script>
+        const baseUrl = 'https://admin:NHDlosin23@203.147.59.117:31954/ISAPI/Streaming/channels/2/picture';
+        const maxImages = 9;
+        let imageHistory = [];
+        let refreshInterval;
+        let isRefreshing = true;
+
+        function addNewImage() {
+            const now = new Date();
+            const timestamp = now.getTime();
+            const timeString = now.toLocaleTimeString();
+            
+            // Create image URL with timestamp to prevent caching
+            const imageUrl = `${baseUrl}?t=${timestamp}`;
+            
+            // Add to history with timestamp
+            imageHistory.unshift({
+                url: imageUrl,
+                time: timeString
+            });
+            
+            if (imageHistory.length > maxImages) {
+                imageHistory.pop();
+            }
+
+            updateGrid();
+            document.getElementById('status').textContent = `Last updated: ${timeString} (${imageHistory.length} images stored)`;
+        }
+
+        function updateGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            
+            imageHistory.forEach((imageData, index) => {
+                const container = document.createElement('div');
+                container.className = 'image-container';
+                
+                const img = document.createElement('img');
+                img.src = imageData.url;
+                img.alt = `CCTV Image ${index + 1}`;
+                img.onerror = function() {
+                    this.style.display = 'none';
+                    console.log('Failed to load image:', imageData.url);
+                };
+                
+                const timestamp = document.createElement('div');
+                timestamp.className = 'timestamp';
+                timestamp.textContent = imageData.time;
+                
+                container.appendChild(img);
+                container.appendChild(timestamp);
+                grid.appendChild(container);
+            });
+        }
+
+        function toggleRefresh() {
+            if (isRefreshing) {
+                clearInterval(refreshInterval);
+                document.getElementById('refresh-status').textContent = 'Auto-refresh: OFF';
+                isRefreshing = false;
+            } else {
+                startRefresh();
+                document.getElementById('refresh-status').textContent = 'Auto-refresh: ON (every 30s)';
+                isRefreshing = true;
+            }
+        }
+
+        function clearImages() {
+            imageHistory = [];
+            updateGrid();
+            document.getElementById('status').textContent = 'Images cleared. Next refresh will start new sequence.';
+        }
+
+        function startRefresh() {
+            refreshInterval = setInterval(addNewImage, 30000); // 30 seconds
+        }
+
+        // Initial load
+        addNewImage();
+        startRefresh();
+    </script>
+</body>
+</html>
