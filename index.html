@@ -1,14 +1,26 @@
 <script>
-    const baseUrl = 'https://admin:NHDlosin23@203.147.59.117:31954/ISAPI/Streaming/channels/2/picture';
+    // CORRECT: Use HTTPS (not HTTP) as in your original URL
+    const username = 'admin';
+    const password = 'NHDlosin23';
+    const cameraIP = '203.147.59.117:31954';
+    const cameraPath = '/ISAPI/Streaming/channels/2/picture';
+    
+    // Method 1: Direct HTTPS URL with authentication
+    const baseUrl = `https://${username}:${password}@${cameraIP}${cameraPath}`;
+    
     const maxImages = 9;
     let imageHistory = [];
+    let refreshInterval;
+    let isRefreshing = true;
 
     function addNewImage() {
         const now = new Date();
         const timestamp = now.getTime();
         const timeString = now.toLocaleTimeString();
+        
         const imageUrl = `${baseUrl}?t=${timestamp}`;
         
+        // Add to history
         imageHistory.unshift({
             url: imageUrl,
             time: timeString
@@ -19,6 +31,7 @@
         }
 
         updateGrid();
+        document.getElementById('status').textContent = `Last updated: ${timeString} (${imageHistory.length} images stored)`;
     }
 
     function updateGrid() {
@@ -28,14 +41,30 @@
         imageHistory.forEach((imageData, index) => {
             const container = document.createElement('div');
             container.className = 'image-container';
-            // Direct img tag - sometimes bypasses mixed content for images
-            container.innerHTML = `
-                <img src="${imageData.url}" alt="CCTV Image ${index + 1}" style="width:100%; height:auto;">
-                <div class="timestamp">${imageData.time}</div>
-            `;
+            
+            const img = document.createElement('img');
+            img.src = imageData.url;
+            img.alt = `CCTV Image ${index + 1}`;
+            
+            img.onload = function() {
+                console.log('Successfully loaded image:', imageData.time);
+            };
+            
+            img.onerror = function() {
+                console.error('Failed to load image:', imageData.time);
+                this.style.display = 'none';
+            };
+            
+            const timestamp = document.createElement('div');
+            timestamp.className = 'timestamp';
+            timestamp.textContent = imageData.time;
+            
+            container.appendChild(img);
+            container.appendChild(timestamp);
             grid.appendChild(container);
         });
     }
+
     function toggleRefresh() {
         if (isRefreshing) {
             clearInterval(refreshInterval);
@@ -55,7 +84,7 @@
     }
 
     function startRefresh() {
-        refreshInterval = setInterval(addNewImage, 30000); // 30 seconds
+        refreshInterval = setInterval(addNewImage, 30000);
     }
 
     // Initial load
